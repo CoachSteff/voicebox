@@ -171,6 +171,7 @@ class ChatterboxTTSBackend:
         language: str = "en",
         seed: Optional[int] = None,
         instruct: Optional[str] = None,
+        tuning: Optional[dict] = None,
     ) -> Tuple[np.ndarray, int]:
         """
         Generate audio using Chatterbox Multilingual TTS.
@@ -181,6 +182,9 @@ class ChatterboxTTSBackend:
             language: BCP-47 language code
             seed: Random seed for reproducibility
             instruct: Unused (protocol compatibility)
+            tuning: Optional per-request overrides for exaggeration / cfg_weight /
+                temperature / repetition_penalty. Keys present here take
+                precedence over the per-language defaults below (Craft patch).
 
         Returns:
             Tuple of (audio_array, sample_rate)
@@ -192,8 +196,12 @@ class ChatterboxTTSBackend:
             logger.warning(f"Reference audio not found: {ref_audio}")
             ref_audio = None
 
-        # Merge language-specific defaults with global defaults
+        # Merge language-specific defaults with global defaults, then apply any
+        # per-request tuning overrides on top (Craft patch).
         lang_defaults = self._LANG_DEFAULTS.get(language, self._GLOBAL_DEFAULTS)
+        gen_params = dict(lang_defaults)
+        if tuning:
+            gen_params.update({k: v for k, v in tuning.items() if v is not None})
 
         def _generate_sync():
             import torch
@@ -207,10 +215,10 @@ class ChatterboxTTSBackend:
                 text,
                 language_id=language,
                 audio_prompt_path=ref_audio,
-                exaggeration=lang_defaults["exaggeration"],
-                cfg_weight=lang_defaults["cfg_weight"],
-                temperature=lang_defaults["temperature"],
-                repetition_penalty=lang_defaults["repetition_penalty"],
+                exaggeration=gen_params["exaggeration"],
+                cfg_weight=gen_params["cfg_weight"],
+                temperature=gen_params["temperature"],
+                repetition_penalty=gen_params["repetition_penalty"],
             )
 
             # Convert tensor -> numpy

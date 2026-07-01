@@ -53,6 +53,17 @@ def _resolve_generation_engine(data: models.GenerationRequest, profile) -> str:
     return data.engine or getattr(profile, "default_engine", None) or getattr(profile, "preset_engine", None) or "qwen"
 
 
+# Engines that accept per-request expressiveness overrides (Craft patch).
+_CHATTERBOX_ENGINES = {"chatterbox", "chatterbox_turbo"}
+
+
+def _chatterbox_tuning(data: models.GenerationRequest, engine: str) -> dict | None:
+    """Per-request tuning dict, but only for Chatterbox engines; else None."""
+    if engine not in _CHATTERBOX_ENGINES:
+        return None
+    return data.chatterbox_tuning()
+
+
 @router.post("/generate", response_model=models.GenerationResponse)
 async def generate_speech(
     data: models.GenerationRequest,
@@ -139,6 +150,7 @@ async def generate_speech(
             mode="generate",
             max_chunk_chars=data.max_chunk_chars,
             crossfade_ms=data.crossfade_ms,
+            tuning=_chatterbox_tuning(data, engine),
         )
     )
 
@@ -362,6 +374,7 @@ async def stream_speech(
         max_chunk_chars=data.max_chunk_chars,
         crossfade_ms=data.crossfade_ms,
         trim_fn=trim_fn,
+        tuning=_chatterbox_tuning(data, engine),
     )
 
     effects_chain_config = None

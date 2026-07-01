@@ -211,6 +211,7 @@ async def generate_chunked(
     max_chunk_chars: int = DEFAULT_MAX_CHUNK_CHARS,
     crossfade_ms: int = 50,
     trim_fn=None,
+    tuning: dict | None = None,
 ) -> Tuple[np.ndarray, int]:
     """Generate audio with automatic chunking for long text.
 
@@ -246,6 +247,10 @@ async def generate_chunked(
     """
     chunks = split_text_into_chunks(text, max_chunk_chars)
 
+    # Only forward `tuning` when set, so backends that don't accept the kwarg
+    # (every engine except Chatterbox) keep their existing signature (Craft patch).
+    tuning_kwarg = {"tuning": tuning} if tuning else {}
+
     if len(chunks) <= 1:
         # Short text — single-shot fast path
         audio, sample_rate = await backend.generate(
@@ -254,6 +259,7 @@ async def generate_chunked(
             language,
             seed,
             instruct,
+            **tuning_kwarg,
         )
         if trim_fn is not None:
             audio = trim_fn(audio, sample_rate)
@@ -287,6 +293,7 @@ async def generate_chunked(
             language,
             chunk_seed,
             instruct,
+            **tuning_kwarg,
         )
         if trim_fn is not None:
             chunk_audio = trim_fn(chunk_audio, chunk_sr)

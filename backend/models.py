@@ -97,9 +97,43 @@ class GenerationRequest(BaseModel):
         default=50, ge=0, le=500, description="Crossfade duration in ms between chunks (0 for hard cut)"
     )
     normalize: bool = Field(default=True, description="Normalize output audio volume")
+    # --- Per-request Chatterbox expressiveness overrides (Craft patch) --------
+    # Optional. Only honoured by the Chatterbox engines (chatterbox /
+    # chatterbox_turbo); ignored for every other engine. When omitted, the
+    # backend's per-language defaults apply exactly as before.
+    exaggeration: Optional[float] = Field(
+        None, ge=0.0, le=2.0,
+        description="Chatterbox only. Emotional intensity / expressiveness. Default ~0.5.",
+    )
+    cfg_weight: Optional[float] = Field(
+        None, ge=0.0, le=1.0,
+        description="Chatterbox only. Classifier-free guidance weight; higher = clearer/steadier. Default ~0.5.",
+    )
+    temperature: Optional[float] = Field(
+        None, ge=0.05, le=2.0,
+        description="Chatterbox only. Sampling temperature; lower = more consistent. Default ~0.8.",
+    )
+    repetition_penalty: Optional[float] = Field(
+        None, ge=1.0, le=4.0,
+        description="Chatterbox only. Penalise repeated tokens. Default ~2.0.",
+    )
     effects_chain: Optional[List["EffectConfig"]] = Field(
         None, description="Effects chain to apply after generation (overrides profile default)"
     )
+
+    def chatterbox_tuning(self) -> Optional[dict]:
+        """Collect the non-None Chatterbox tuning overrides, or None if empty."""
+        tuning = {
+            k: v
+            for k, v in {
+                "exaggeration": self.exaggeration,
+                "cfg_weight": self.cfg_weight,
+                "temperature": self.temperature,
+                "repetition_penalty": self.repetition_penalty,
+            }.items()
+            if v is not None
+        }
+        return tuning or None
 
 
 class GenerationResponse(BaseModel):
